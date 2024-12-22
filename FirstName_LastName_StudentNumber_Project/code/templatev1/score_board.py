@@ -2,30 +2,30 @@
 
 from PyQt6.QtWidgets import (
     QDockWidget, QVBoxLayout, QWidget, QLabel,
-    QGroupBox, QHBoxLayout, QPushButton, QMessageBox
+    QGroupBox, QHBoxLayout, QPushButton, QMessageBox, QPlainTextEdit
 )
 from PyQt6.QtCore import pyqtSlot, Qt
 
 class ScoreBoard(QDockWidget):
     """
     A QDockWidget that displays:
-      - Current click location
-      - Time remaining
-      - Current player
-      - Black captures, White captures
-      - Black territory, White territory
-      - Pass / Reset buttons
-      - Game over message
+      -> Timer
+      -> Current player
+      -> Black/White captures, territory
+      -> Stack-like log (newest on top)
+      -> Pass/Reset buttons
+      -> A popup on game over
     """
 
     def __init__(self):
         super().__init__()
         self.board = None
+        # We'll keep a list of messages, with the newest at index 0
+        self.logMessages = []
         self.initUI()
 
     def initUI(self):
-        """Set up the dock widget's layout and widgets."""
-        self.resize(220, 300)
+        self.resize(250, 450)
         self.setWindowTitle("ScoreBoard")
         self.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
 
@@ -33,46 +33,64 @@ class ScoreBoard(QDockWidget):
         self.setWidget(self.mainWidget)
         self.mainLayout = QVBoxLayout(self.mainWidget)
 
-        # Style (QSS)
+        # STYLE UWU
         self.setStyleSheet("""
             QDockWidget {
-                background-color: #FAF0E6; /* Linen */
+                background-color: #2D2D2D;
+                color: #EEEEEE;
+                font-family: Arial;
                 font-size: 14px;
             }
-            QLabel {
-                font-weight: bold;
-                color: #333333;
-            }
             QGroupBox {
-                font-weight: bold;
-                border: 2px solid #8B4513; /* SaddleBrown */
-                border-radius: 5px;
                 margin-top: 10px;
+                border: 2px solid #888888;
+                border-radius: 5px;
+                font-weight: bold;
+                color: #FFFFFF;
+            }
+            QLabel {
+                color: #DDDDDD;
             }
             QPushButton {
-                background-color: #F5DEB3; /* Wheat */
-                border: 1px solid #8B4513;
+                background-color: #444444;
+                color: #FFFFFF;
+                border: 1px solid #AAAAAA;
                 border-radius: 4px;
-                padding: 3px 8px;
+                padding: 5px 10px;
             }
             QPushButton:hover {
-                background-color: #DEB887; /* BurlyWood */
+                background-color: #666666;
+            }
+            QPlainTextEdit {
+                background-color: #1E1E1E;
+                color: #DDDDDD;
+                border: 1px solid #555555;
             }
         """)
 
-        # ------------------ Game Info: Click & Timer ------------------
-        infoGroup = QGroupBox("Game Info")
-        infoLayout = QVBoxLayout()
+        # ------------------ Timer + Controls  ------------------
+        topGroup = QGroupBox("Game Controls")
+        topLayout = QVBoxLayout()
 
-        self.label_clickLocation = QLabel("Click Location: N/A")
-        self.label_timeRemaining = QLabel("Time Remaining: 60s")
+        self.label_timeRemaining = QLabel("Time: 60s")
+        topLayout.addWidget(self.label_timeRemaining)
 
-        infoLayout.addWidget(self.label_clickLocation)
-        infoLayout.addWidget(self.label_timeRemaining)
-        infoGroup.setLayout(infoLayout)
-        self.mainLayout.addWidget(infoGroup)
+        # Buttons layout
+        btnLayout = QHBoxLayout()
+        self.passButton = QPushButton("Pass")
+        btnLayout.addWidget(self.passButton)
+        self.resetButton = QPushButton("Reset")
+        btnLayout.addWidget(self.resetButton)
+        topLayout.addLayout(btnLayout)
 
-        # ------------------ Scores: Player, Captures, Territory ------------------
+        topGroup.setLayout(topLayout)
+        self.mainLayout.addWidget(topGroup)
+
+        # Connect buttons
+        self.passButton.clicked.connect(self.onPassClicked)
+        self.resetButton.clicked.connect(self.onResetClicked)
+
+        # ------------------ Scores (Current Player, Captures, Territory) ------------------
         scoreGroup = QGroupBox("Scores")
         scoreLayout = QVBoxLayout()
 
@@ -80,15 +98,15 @@ class ScoreBoard(QDockWidget):
         scoreLayout.addWidget(self.label_currentPlayer)
 
         capturesLayout = QHBoxLayout()
-        self.label_blackCaptures = QLabel("Black Captures: 0")
-        self.label_whiteCaptures = QLabel("White Captures: 0")
+        self.label_blackCaptures = QLabel("Black Caps: 0")
+        self.label_whiteCaptures = QLabel("White Caps: 0")
         capturesLayout.addWidget(self.label_blackCaptures)
         capturesLayout.addWidget(self.label_whiteCaptures)
         scoreLayout.addLayout(capturesLayout)
 
         territoryLayout = QHBoxLayout()
-        self.label_blackTerritory = QLabel("Black Territory: 0")
-        self.label_whiteTerritory = QLabel("White Territory: 0")
+        self.label_blackTerritory = QLabel("Black Terr: 0")
+        self.label_whiteTerritory = QLabel("White Terr: 0")
         territoryLayout.addWidget(self.label_blackTerritory)
         territoryLayout.addWidget(self.label_whiteTerritory)
         scoreLayout.addLayout(territoryLayout)
@@ -96,109 +114,114 @@ class ScoreBoard(QDockWidget):
         scoreGroup.setLayout(scoreLayout)
         self.mainLayout.addWidget(scoreGroup)
 
-        # ------------------ Controls: Pass, Reset ------------------
-        controlsGroup = QGroupBox("Controls")
-        controlsLayout = QHBoxLayout()
-
-        self.passButton = QPushButton("Pass")
-        self.passButton.clicked.connect(self.onPassClicked)
-        controlsLayout.addWidget(self.passButton)
-
-        self.resetButton = QPushButton("Reset")
-        self.resetButton.clicked.connect(self.onResetClicked)
-        controlsLayout.addWidget(self.resetButton)
-
-        controlsGroup.setLayout(controlsLayout)
-        self.mainLayout.addWidget(controlsGroup)
+        # ------------------ Game Log (Stack-like) ------------------
+        logGroup = QGroupBox("Game Log")
+        logLayout = QVBoxLayout()
+        self.gameLogText = QPlainTextEdit()
+        self.gameLogText.setReadOnly(True)
+        logLayout.addWidget(self.gameLogText)
+        logGroup.setLayout(logLayout)
+        self.mainLayout.addWidget(logGroup)
 
         self.mainWidget.setLayout(self.mainLayout)
         self.show()
 
     def make_connection(self, board):
         """
-        Connect signals from Board and its GameLogic to update the ScoreBoard.
-        Also keep a reference to board for pass/reset.
+        Connect signals from the Board
         """
         self.board = board
 
         # Board signals
-        board.clickLocationSignal.connect(self.setClickLocation)
-        board.updateTimerSignal.connect(self.setTimeRemaining)
+        board.clickLocationSignal.connect(self.onClickLocation)
+        board.updateTimerSignal.connect(self.onTimeUpdate)
+        board.infoMessageSignal.connect(self.onInfoMessage)
 
         # GameLogic signals
         gameLogic = board.gameLogic
-        gameLogic.currentPlayerChangedSignal.connect(self.updateCurrentPlayer)
-        gameLogic.capturesUpdatedSignal.connect(self.updateCaptures)
-        gameLogic.territoryUpdatedSignal.connect(self.updateTerritory)
+        gameLogic.currentPlayerChangedSignal.connect(self.onCurrentPlayerChanged)
+        gameLogic.capturesUpdatedSignal.connect(self.onCapturesUpdated)
+        gameLogic.territoryUpdatedSignal.connect(self.onTerritoryUpdated)
         gameLogic.gameOverSignal.connect(self.onGameOver)
 
-    # -------------------------------------------------------------------------
-    # Slots responding to Board signals
-    # -------------------------------------------------------------------------
+    # ------------------------------ Board Slots ------------------------------
     @pyqtSlot(str)
-    def setClickLocation(self, clickLoc):
-        """Update the label for the clicked location on the board."""
-        self.label_clickLocation.setText(f"Click Location: {clickLoc}")
+    def onClickLocation(self, clickLoc):
+        # Optionally do nothing, or just log it
+        # Never used it 
+        pass
 
     @pyqtSlot(int)
-    def setTimeRemaining(self, timeRemaining):
-        """Update the label for time remaining."""
-        self.label_timeRemaining.setText(f"Time Remaining: {timeRemaining}s")
+    def onTimeUpdate(self, timeRemaining):
+        """
+        Update the scoreboard with the countdown
+        """
+        self.label_timeRemaining.setText(f"Time: {timeRemaining}s")
 
-    # -------------------------------------------------------------------------
-    # Slots responding to GameLogic signals
-    # -------------------------------------------------------------------------
     @pyqtSlot(str)
-    def updateCurrentPlayer(self, playerColor):
-        """Update which player's turn it is."""
-        # Could be "Black" or "White"
+    def onInfoMessage(self, message):
+        """
+        We want the newest message on top => Insert at index 0 in self
+        """
+        self.logMessages.insert(0, message)
+        # We could rejoin them with \n
+        self.gameLogText.setPlainText("\n".join(self.logMessages))
+
+    # ------------------------------ GameLogic Slots ------------------------------
+    @pyqtSlot(str)
+    def onCurrentPlayerChanged(self, playerColor):
+        """
+        Update label for the current player
+        """
         self.label_currentPlayer.setText(f"Current Player: {playerColor}")
 
     @pyqtSlot(int, int)
-    def updateCaptures(self, blackCaptured, whiteCaptured):
-        """Update capture counts for Black and White."""
-        self.label_blackCaptures.setText(f"Black Captures: {blackCaptured}")
-        self.label_whiteCaptures.setText(f"White Captures: {whiteCaptured}")
+    def onCapturesUpdated(self, blackCaps, whiteCaps):
+        """
+        Update captures for Black/White
+        """
+        self.label_blackCaptures.setText(f"Black Caps: {blackCaps}")
+        self.label_whiteCaptures.setText(f"White Caps: {whiteCaps}")
 
     @pyqtSlot(int, int)
-    def updateTerritory(self, blackTerr, whiteTerr):
-        """Update territory counts for Black and White."""
-        self.label_blackTerritory.setText(f"Black Territory: {blackTerr}")
-        self.label_whiteTerritory.setText(f"White Territory: {whiteTerr}")
+    def onTerritoryUpdated(self, blackTerr, whiteTerr):
+        """
+        Update territory counts
+        """
+        self.label_blackTerritory.setText(f"Black Terr: {blackTerr}")
+        self.label_whiteTerritory.setText(f"White Terr: {whiteTerr}")
 
     @pyqtSlot(str)
     def onGameOver(self, resultMsg):
         """
-        Called when the game is over (2 passes).
-        Display final results; you could also disable moves or show a pop-up.
+        Show final results in a popup, disable 'Pass', log the message
+        at the top of the stack
         """
-        # Disable pass button so no more moves
         self.passButton.setEnabled(False)
 
-        # Option 1: Just display in the timeRemaining label
-        self.label_timeRemaining.setText(resultMsg)
+        # Insert the game over message at
+        self.onInfoMessage(resultMsg)
 
-        # Option 2: Show a pop-up message
-        # msg_box = QMessageBox(self)
-        # msg_box.setWindowTitle("Game Over")
-        # msg_box.setText(resultMsg)
-        # msg_box.exec()
+        box = QMessageBox(self)
+        box.setWindowTitle("Game Over!")
+        box.setText(resultMsg)
+        box.exec()
 
-    # -------------------------------------------------------------------------
-    # Pass & Reset button handlers
-    # -------------------------------------------------------------------------
+    # ------------------------------ Button Handlers ------------------------------
     def onPassClicked(self):
-        """When user clicks 'Pass', call board.passMove()."""
+        """
+        User clicks 'Pass'
+        """
         if self.board:
             self.board.passMove()
 
     def onResetClicked(self):
-        """When user clicks 'Reset', reset the board (new game)."""
+        """
+        User clicks 'Reset'
+        """
         if self.board:
             self.board.resetGame()
-            # Re-enable pass button if it was disabled
             self.passButton.setEnabled(True)
-
-    def center(self):
-        """No-op for a dock widget in this example."""
-        pass
+            # Clear the old log? how knows
+            self.logMessages.clear()
+            self.gameLogText.setPlainText("")

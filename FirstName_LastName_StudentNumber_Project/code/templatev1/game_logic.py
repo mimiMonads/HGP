@@ -33,11 +33,11 @@ class GameLogic(QObject):
     def resetGame(self):
         """
         Reset everything for a new game:
-          - Empty board
-          - Black moves first
-          - Clear captures & territory
-          - Clear pass count
-          - Not game over
+          -> Empty board
+          -> Black moves first
+          -> Clear captures & territory
+          -> Clear pass count
+          -> Not game over
         """
         # Board: 2D list storing 'B', 'W', or None
         self.boardArray = [[None for _ in range(self.width)] for _ in range(self.height)]
@@ -54,11 +54,11 @@ class GameLogic(QObject):
     def handleMove(self, row, col):
         """
         Handle stone placement at (row, col). If the move is valid:
-         - Place stone
-         - Capture enemy stones if they have no liberties
-         - Check for suicide (remove own stones if no liberties & no capture)
-         - Switch player
-         - Reset consecutivePasses
+         -> Place stone
+         -> Capture enemy stones if they have no liberties
+         -> Check for suicide (remove own stones if no liberties & no capture)
+         -> Switch player
+         -> Reset consecutivePasses
         """
         if self.gameOver:
             return
@@ -74,19 +74,19 @@ class GameLogic(QObject):
         # Place stone
         self.boardArray[row][col] = self.currentPlayer
 
-        # We'll check captures after placing the stone, so we won't count it as a pass
+        # We wll check captures after placing the stone, so we won't count it as a pass
         self.consecutivePasses = 0
 
         # Capture any opponent stones with no liberties
         capturedStones = self._captureOpponents()
 
-        # Check for self-suicide: if newly placed stone has no liberties & no captures
+        # Check for self suicide: if newly placed stone has no liberties & no captures
         group, liberties = self._get_group_and_liberties(row, col, self.currentPlayer)
         if liberties == 0 and capturedStones == 0:
             # Remove our own stone(s) => illegal move
             for (r, c) in group:
                 self.boardArray[r][c] = None
-            # Don’t switch player – effectively an invalid move
+            # Dont switch player <–> effectively an invalid move
             return
 
         # If we captured stones, update scoreboard
@@ -149,13 +149,17 @@ class GameLogic(QObject):
     # ------------------------------------------
 
     def _emitInitialSignals(self):
-        """Emit initial scoreboard signals."""
+        """
+        Emit initial scoreboard signals
+        """
         self.currentPlayerChangedSignal.emit("Black")  # Start with black
         self.capturesUpdatedSignal.emit(self.blackCaptures, self.whiteCaptures)
         self.territoryUpdatedSignal.emit(self.blackTerritory, self.whiteTerritory)
 
     def _switchPlayer(self):
-        """Switch from B to W or W to B, emit signal for scoreboard."""
+        """
+        Switch from B to W or W to B, emit signal for scoreboard
+        """
         if self.currentPlayer == "B":
             self.currentPlayer = "W"
             self.currentPlayerChangedSignal.emit("White")
@@ -275,7 +279,7 @@ class GameLogic(QObject):
         Compare final scores:
             blackScore = blackTerritory + blackCaptures
             whiteScore = whiteTerritory + whiteCaptures
-        Then emit a message via gameOverSignal.
+        Then emit a message via gameOverSignal
         """
         black_score = self.blackTerritory + self.blackCaptures
         white_score = self.whiteTerritory + self.whiteCaptures

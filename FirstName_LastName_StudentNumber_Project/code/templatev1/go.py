@@ -16,10 +16,15 @@ class Go(QMainWindow):
         return self.scoreBoard
 
     def initUI(self):
-        """Initialize the main window: Board at center, ScoreBoard as dock."""
+        """Initialize the main window
+         Adds:
+         -> Board at center
+         -> ScoreBoard as dock
+         """
         self.board = Board(self)
         self.setCentralWidget(self.board)
 
+        # To dock 
         self.scoreBoard = ScoreBoard()
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.scoreBoard)
         self.scoreBoard.make_connection(self.board)

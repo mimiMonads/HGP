@@ -1,4 +1,4 @@
-# TODO: Add more functions as needed for your Pieces
+# Never changed it 
 class Piece(object):
     NoPiece = 0
     White = 1
