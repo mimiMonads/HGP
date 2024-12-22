@@ -1,10 +1,10 @@
+# go.py
 from PyQt6.QtWidgets import QMainWindow
 from PyQt6.QtCore import Qt
 from board import Board
 from score_board import ScoreBoard
 
 class Go(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -16,9 +16,10 @@ class Go(QMainWindow):
         return self.scoreBoard
 
     def initUI(self):
-        '''initiates application UI'''
+        """Initialize the main window: Board at center, ScoreBoard as dock."""
         self.board = Board(self)
         self.setCentralWidget(self.board)
+
         self.scoreBoard = ScoreBoard()
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.scoreBoard)
         self.scoreBoard.make_connection(self.board)
@@ -29,11 +30,8 @@ class Go(QMainWindow):
         self.show()
 
     def center(self):
-        '''centers the window on the screen'''
+        """Centers the window on the screen."""
         gr = self.frameGeometry()
         screen = self.screen().availableGeometry().center()
-
         gr.moveCenter(screen)
         self.move(gr.topLeft())
-        #size = self.geometry()
-        #self.move((screen.width() - size.width()) / 2,(screen.height() - size.height()) / 2)
