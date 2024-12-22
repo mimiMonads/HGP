@@ -25,7 +25,6 @@ class GameLogic(QObject):
         self.width = width
         self.height = height
         self.resetGame()
-
     # ------------------------------------------
     # Public Interface
     # ------------------------------------------
@@ -38,17 +37,18 @@ class GameLogic(QObject):
           -> Clear captures & territory
           -> Clear pass count
           -> Not game over
+          -> Clear previous board states for KO rule
         """
-        # Board: 2D list storing 'B', 'W', or None
-        self.boardArray = [[None for _ in range(self.width)] for _ in range(self.height)]
-        self.currentPlayer = "B"  # 'B' or 'W'
+        self.boardArray = [[None] * self.width for _ in range(self.height)]
+        self.currentPlayer = "B"  # Starting with black
         self.blackCaptures = 0
         self.whiteCaptures = 0
-        self.blackTerritory = 0
-        self.whiteTerritory = 0
-        self.consecutivePasses = 0
+        self.blackTerritory = 0  # Initialize black territory
+        self.whiteTerritory = 0  # Initialize white territory
         self.gameOver = False
+        self.previousBoardStates = []  # List to store board states for KO rule
 
+        # Emit initial signals if needed
         self._emitInitialSignals()
 
     def handleMove(self, row, col):
@@ -57,44 +57,88 @@ class GameLogic(QObject):
          -> Place stone
          -> Capture enemy stones if they have no liberties
          -> Check for suicide (remove own stones if no liberties & no capture)
+         -> Check for KO (illegal move if it recreates the previous board state)
          -> Switch player
          -> Reset consecutivePasses
         """
         if self.gameOver:
             return
 
-        # Check board bounds
+        # Ensure the move is within bounds
         if not (0 <= row < self.height and 0 <= col < self.width):
             return
 
-        # Cell must be empty
+        # Ensure the cell is empty
         if self.boardArray[row][col] is not None:
             return
 
-        # Place stone
-        self.boardArray[row][col] = self.currentPlayer
+        # Save current board state before making a move for KO check
+        self.previousBoardStates.append(self._copyBoard())
 
-        # We wll check captures after placing the stone, so we won't count it as a pass
-        self.consecutivePasses = 0
+        # Place the stone
+        self.boardArray[row][col] = self.currentPlayer
 
         # Capture any opponent stones with no liberties
         capturedStones = self._captureOpponents()
 
-        # Check for self suicide: if newly placed stone has no liberties & no captures
+        # Check for suicide: if the move leads to no liberties for the stone
         group, liberties = self._get_group_and_liberties(row, col, self.currentPlayer)
         if liberties == 0 and capturedStones == 0:
-            # Remove our own stone(s) => illegal move
+            # Undo the move if it's a suicide
             for (r, c) in group:
                 self.boardArray[r][c] = None
-            # Dont switch player <–> effectively an invalid move
             return
 
-        # If we captured stones, update scoreboard
+        # Check for KO: If the move recreates the previous board state, it's a KO
+        if self._isKO():
+            # Undo the move to prevent KO
+            self.boardArray[row][col] = None
+            self.previousBoardStates.pop()  # Remove the saved board state
+            return
+
+        # Update captures and switch players
         if capturedStones > 0:
+            if self.currentPlayer == "B":
+                self.blackCaptures += capturedStones
+            else:
+                self.whiteCaptures += capturedStones
             self.capturesUpdatedSignal.emit(self.blackCaptures, self.whiteCaptures)
+
+        # Update territory (you would calculate and update this as needed)
+        self._updateTerritory()
 
         # Switch player
         self._switchPlayer()
+
+    def _updateTerritory(self):
+        self.blackTerritory = 0  # Replace with actual logic
+        self.whiteTerritory = 0  # Replace with actual logic
+
+        # Emit the updated territories
+        self.territoryUpdatedSignal.emit(self.blackTerritory, self.whiteTerritory)
+
+
+    def _isKO(self):
+        """
+        Check if the current board state results in a KO situation.
+        This compares the current board with the most recent previous state.
+        """
+        if len(self.previousBoardStates) < 1:
+            return False  # No previous state to compare with
+
+        lastBoardState = self.previousBoardStates[-1]
+
+        # Compare the board state to see if it matches the previous one
+        for r in range(self.height):
+            for c in range(self.width):
+                if self.boardArray[r][c] != lastBoardState[r][c]:
+                    return False
+        return True
+
+    def _copyBoard(self):
+        """Helper method to create a deep copy of the board for comparison."""
+        return [row[:] for row in self.boardArray]
+    
 
     def passMove(self):
         """
@@ -195,6 +239,7 @@ class GameLogic(QObject):
                 self.blackCaptures += captured_stones
             else:
                 self.whiteCaptures += captured_stones
+            self.capturesUpdatedSignal.emit(self.blackCaptures, self.whiteCaptures)
 
         return captured_stones
 
