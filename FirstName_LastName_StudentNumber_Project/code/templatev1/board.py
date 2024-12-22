@@ -7,22 +7,20 @@ from game_logic import GameLogic
 
 class Board(QFrame):
     # Signals for scoreboard
-    updateTimerSignal = pyqtSignal(int)   # countdown updates
-    clickLocationSignal = pyqtSignal(str) # "[2, 3]"
-    infoMessageSignal  = pyqtSignal(str)  # game/log messages
+    updateTimerSignal = pyqtSignal(int)   
+    clickLocationSignal = pyqtSignal(str)
+    infoMessageSignal  = pyqtSignal(str)
 
-    # Board size & timer
     boardWidth = 7
     boardHeight = 7
     timerSpeed = 1000  # 1 second
-    counter = 60       # example countdown
+    counter = 300      
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initBoard()
         self.setMinimumSize(200, 200)
 
-        # Variables to store scoreboard data
         self.currentPlayer = "Black"
         self.blackCaptures = 0
         self.whiteCaptures = 0
@@ -30,14 +28,13 @@ class Board(QFrame):
         self.whiteTerritory = 0
 
     def initBoard(self):
-        """Initialize the board logic & timer."""
+        """
+        Initialize the board logic & timer
+        """
         self.timer = QBasicTimer()
         self.isStarted = False
 
-        # Initialize game logic
         self.gameLogic = GameLogic(self.boardWidth, self.boardHeight, parent=self)
-
-        # Connect signals
         self.gameLogic.currentPlayerChangedSignal.connect(self.onCurrentPlayerChanged)
         self.gameLogic.capturesUpdatedSignal.connect(self.onCapturesUpdated)
         self.gameLogic.territoryUpdatedSignal.connect(self.onTerritoryUpdated)
@@ -46,30 +43,30 @@ class Board(QFrame):
         self.start()
 
     def start(self):
-        """Start/restart the game."""
+        """
+        Start/restart the game
+        """
         self.isStarted = True
         self.resetGame()
         self.timer.start(self.timerSpeed, self)
-        self.infoMessageSignal.emit("Game started.")
+        self.infoMessageSignal.emit("Game started. 5 minutes on the clock.")
 
     def timerEvent(self, event):
-        """Simple countdown timer logic with time-up => forced game over."""
+        """Countdown logic for 5 minutes total."""
         if event.timerId() == self.timer.timerId():
             if self.counter == 0:
-                # Time is up -> Determine a winner quickly
-
+                # Time’s up: The other player wins
                 if self.currentPlayer == "Black":
                     winner = "White"
                 else:
                     winner = "Black"
-
                 msg = f"Time's up! {winner} wins on time."
                 self.infoMessageSignal.emit(msg)
-                
-                # Stop the timer and trigger game over
+
                 self.isStarted = False
                 self.timer.stop()
-                # We can emit the 'gameOverSignal'
+
+                # Trigger scoreboard popup
                 self.gameLogic.gameOverSignal.emit(msg)
 
             else:
@@ -82,22 +79,15 @@ class Board(QFrame):
         painter = QPainter(self)
         self.drawBackground(painter)
         self.drawBoardSquares(painter)
-
         self.gameLogic.drawPieces(
-            painter,
-            self.squareWidth(),
-            self.squareHeight(),
-            self.width(),
-            self.height()
+            painter, self.squareWidth(), self.squareHeight(),
+            self.width(), self.height()
         )
 
     def drawBackground(self, painter):
-        painter.fillRect(self.rect(), QColor(139, 69, 19))  # Brownish background
+        painter.fillRect(self.rect(), QColor(139, 69, 19))
 
     def drawBoardSquares(self, painter):
-        """
-        Draw the 7x7
-        """
         painter.setPen(Qt.GlobalColor.black)
         square_size = self.squareWidth()
         offsetX = (self.width() - square_size * self.boardWidth) / 2
@@ -110,9 +100,6 @@ class Board(QFrame):
                 painter.drawRect(left, top, int(square_size), int(square_size))
 
     def mousePressEvent(self, event):
-        """
-        Handle board clicks
-        """
         if not self.isStarted:
             return
 
@@ -130,9 +117,6 @@ class Board(QFrame):
             self.update()
 
     def passMove(self):
-        """
-        When user clicks 'Pass'
-        """
         if not self.isStarted:
             return
         self.infoMessageSignal.emit("Player passes.")
@@ -140,22 +124,10 @@ class Board(QFrame):
         self.update()
 
     def resetGame(self):
-        """
-        Reset & restart the game
-        """
         self.gameLogic.resetGame()
-        self.counter = 60
+        self.counter = 300  # reset to 5 minutes
         self.update()
-        self.infoMessageSignal.emit("Game reset.")
-
-    # It was removed but Im keeping it just in case
-    def printBoardArray(self):
-        """
-        Debug utility
-        """
-        print("Board State:")
-        for row in self.gameLogic.boardArray:
-            print(" ".join(['.' if cell is None else str(cell) for cell in row]))
+        self.infoMessageSignal.emit("Game reset. Clock back to 5 minutes.")
 
     def squareWidth(self):
         return min(self.width(), self.height()) / self.boardWidth
